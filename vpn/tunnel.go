@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	reqHeaders["X-CSTP-VPNAddress-Type"] = "IPv4"
+	reqHeaders["X-CSTP-VPNAddress-Type"] = "IPv4,ipv6"
 	// Payload + 8 + 加密扩展位 + TCP或UDP头 + IP头 最好小于 1500，这里参考 AnyConnect 设置
 	reqHeaders["X-CSTP-MTU"] = "1399"
 	reqHeaders["X-CSTP-Base-MTU"] = "1399"
