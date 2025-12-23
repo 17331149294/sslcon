@@ -25,8 +25,8 @@ func init() {
 	}
 	serviceConfig = &service.Config{
 		Name:        svcName,
-		DisplayName: "SSLCon VPN Agent",
-		Description: "SSLCon SSL VPN service Agent",
+		DisplayName: "fuck",
+		Description: "fuck you",
 	}
 }
 
