@@ -90,7 +90,8 @@ func InitAuth() error {
 		InsecureSkipVerify: base.Cfg.InsecureSkipVerify,
 	}
 	var err error
-	Conn, err = tls.DialWithDialer(&net.Dialer{Timeout: 6 * time.Second}, "tcp4", Prof.HostWithPort, &config)
+	// 使用 "tcp" 双栈拨号：同时支持 IPv4(A) 与 IPv6(AAAA) 域名解析，避免纯 IPv6 服务器连不上
+	Conn, err = tls.DialWithDialer(&net.Dialer{Timeout: 6 * time.Second}, "tcp", Prof.HostWithPort, &config)
 	if err != nil {
 		return err
 	}

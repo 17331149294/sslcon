@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
-	"strings"
 
 	"sslcon/auth"
 	"sslcon/base"
@@ -91,7 +91,12 @@ func SetupTunnel() error {
 	}
 
 	cSess := session.Sess.NewConnSession(&resp.Header)
-	cSess.ServerAddress = strings.Split(auth.Conn.RemoteAddr().String(), ":")[0]
+	// 兼容 IPv6 地址：RemoteAddr 形如 "1.2.3.4:443" 或 "[2001:db8::1]:443"，用 SplitHostPort 正确解析
+	if host, _, err := net.SplitHostPort(auth.Conn.RemoteAddr().String()); err == nil {
+		cSess.ServerAddress = host
+	} else {
+		cSess.ServerAddress = auth.Conn.RemoteAddr().String()
+	}
 	cSess.Hostname = auth.Prof.Host
 	cSess.TLSCipherSuite = tls.CipherSuiteName(auth.Conn.ConnectionState().CipherSuite)
 

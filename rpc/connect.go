@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	"strings"
+	"net"
 
 	"sslcon/auth"
 	"sslcon/session"
@@ -11,10 +11,12 @@ import (
 
 // Connect 调用之前必须由前端填充 auth.Prof，建议填充 base.Interface
 func Connect() error {
-	if strings.Contains(auth.Prof.Host, ":") {
+	// 已是 host:port（含 [ipv6]:port）则直接用；否则补默认端口 443，
+	// net.JoinHostPort 会自动给裸 IPv6 地址加方括号（2001:db8::1 -> [2001:db8::1]:443）
+	if _, _, err := net.SplitHostPort(auth.Prof.Host); err == nil {
 		auth.Prof.HostWithPort = auth.Prof.Host
 	} else {
-		auth.Prof.HostWithPort = auth.Prof.Host + ":443"
+		auth.Prof.HostWithPort = net.JoinHostPort(auth.Prof.Host, "443")
 	}
 	if !auth.Prof.Initialized {
 		err := vpnc.GetLocalInterface()

@@ -33,7 +33,14 @@ func dtlsChannel(cSess *session.ConnSession) {
 	}()
 
 	port, _ := strconv.Atoi(cSess.DTLSPort)
-	addr := &net.UDPAddr{IP: net.ParseIP(cSess.ServerAddress), Port: port}
+	ip := net.ParseIP(cSess.ServerAddress)
+	addr := &net.UDPAddr{IP: ip, Port: port}
+
+	// 按服务器地址族选择 UDP 网络：纯 IPv6 服务器需用 udp6，否则无法建立 DTLS
+	udpNetwork := "udp4"
+	if ip != nil && ip.To4() == nil {
+		udpNetwork = "udp6"
+	}
 
 	id, _ := hex.DecodeString(cSess.DTLSId)
 
@@ -62,7 +69,7 @@ func dtlsChannel(cSess *session.ConnSession) {
 		// PSKIdentityHint: id,
 	}
 
-	conn, err = dtls.Dial("udp4", addr, config)
+	conn, err = dtls.Dial(udpNetwork, addr, config)
 	// https://github.com/pion/dtls/pull/649
 	if err != nil {
 		base.Error(err)
