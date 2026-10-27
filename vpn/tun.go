@@ -17,12 +17,12 @@ var offset = 0 // reserve space for header
 
 func setupTun(cSess *session.ConnSession) error {
 	if runtime.GOOS == "windows" {
-		cSess.TunName = "SSLCon"
+		cSess.TunName = "Fuck123"
 	} else if runtime.GOOS == "darwin" {
 		cSess.TunName = "utun"
 		offset = 4
 	} else {
-		cSess.TunName = "sslcon"
+		cSess.TunName = "Fuck123"
 	}
 	dev, err := tun.CreateTUN(cSess.TunName, cSess.MTU)
 	if err != nil {

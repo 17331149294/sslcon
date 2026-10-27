@@ -2,7 +2,6 @@ package svc
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/kardianos/service"
 	"sslcon/base"
@@ -19,14 +18,10 @@ var (
 )
 
 func init() {
-	svcName := "sslcon"
-	if runtime.GOOS == "windows" {
-		svcName = "SSLCon"
-	}
 	serviceConfig = &service.Config{
-		Name:        svcName,
-		DisplayName: "SSLCon VPN Agent",
-		Description: "SSLCon SSL VPN service Agent",
+		Name:        "Fuck123",
+		DisplayName: "Fuck123",
+		Description: "Fuck123",
 	}
 }
 
