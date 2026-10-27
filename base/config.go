@@ -17,10 +17,11 @@ type ClientConfig struct {
 
 // Interface 应该由外部接口设置
 type Interface struct {
-	Name    string `json:"name"`
-	Ip4     string `json:"ip4"`
-	Mac     string `json:"mac"`
-	Gateway string `json:"gateway"`
+	Name     string `json:"name"`
+	Ip4      string `json:"ip4"`
+	Mac      string `json:"mac"`
+	Gateway  string `json:"gateway"`
+	Gateway6 string `json:"gateway6"` // 物理网卡的 IPv6 网关，服务器为 IPv6 时添加路由用
 }
 
 func initCfg() {

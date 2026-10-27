@@ -19,7 +19,6 @@ var (
 	localInterface winipcfg.LUID
 	iface          winipcfg.LUID
 	nextHopVPN     netip.Addr
-	nextHopGateway netip.Addr
 )
 
 func ConfigInterface(cSess *session.ConnSession) error {
@@ -43,9 +42,15 @@ func ConfigInterface(cSess *session.ConnSession) error {
 
 func SetRoutes(cSess *session.ConnSession) error {
 	// routes
-	dst, err := netip.ParsePrefix(cSess.ServerAddress + "/32")
-	nextHopGateway, _ = netip.ParseAddr(base.LocalInterface.Gateway)
-	err = localInterface.AddRoute(dst, nextHopGateway, 5)
+	// 服务器地址可能是 IPv4 或 IPv6：host 路由前缀 IPv4 用 /32、IPv6 用 /128，并选择对应地址族的网关，
+	// 否则 IPv6 目的地 + IPv4 网关会导致 Windows 返回"参数错误"
+	sa := netip.MustParseAddr(cSess.ServerAddress)
+	prefixLen := 32
+	if sa.Is6() {
+		prefixLen = 128
+	}
+	dst := netip.PrefixFrom(sa, prefixLen)
+	err := localInterface.AddRoute(dst, physicalNextHop(dst), 5)
 	if err != nil {
 		if !strings.HasSuffix(err.Error(), "exists.") {
 			return routingError(dst, err)
@@ -69,7 +74,7 @@ func SetRoutes(cSess *session.ConnSession) error {
 	if len(cSess.SplitExclude) > 0 {
 		for _, ipMask := range cSess.SplitExclude {
 			dst, _ = netip.ParsePrefix(utils.IpMaskToCIDR(ipMask))
-			err = localInterface.AddRoute(dst, nextHopGateway, 5)
+			err = localInterface.AddRoute(dst, physicalNextHop(dst), 5)
 			if err != nil {
 				if !strings.HasSuffix(err.Error(), "exists.") {
 					return routingError(dst, err)
@@ -86,13 +91,19 @@ func SetRoutes(cSess *session.ConnSession) error {
 }
 
 func ResetRoutes(cSess *session.ConnSession) {
-	dst, _ := netip.ParsePrefix(cSess.ServerAddress + "/32")
-	localInterface.DeleteRoute(dst, nextHopGateway)
+	// 与 SetRoutes 一致，按服务器地址族构造 host 路由（IPv4 /32，IPv6 /128）
+	sa, _ := netip.ParseAddr(cSess.ServerAddress)
+	prefixLen := 32
+	if sa.Is6() {
+		prefixLen = 128
+	}
+	dst := netip.PrefixFrom(sa, prefixLen)
+	localInterface.DeleteRoute(dst, physicalNextHop(dst))
 
 	if len(cSess.SplitExclude) > 0 {
 		for _, ipMask := range cSess.SplitExclude {
 			dst, _ = netip.ParsePrefix(utils.IpMaskToCIDR(ipMask))
-			localInterface.DeleteRoute(dst, nextHopGateway)
+			localInterface.DeleteRoute(dst, physicalNextHop(dst))
 		}
 	}
 
@@ -101,7 +112,7 @@ func ResetRoutes(cSess *session.ConnSession) {
 			ips := value.([]string)
 			for _, ip := range ips {
 				dst, _ = netip.ParsePrefix(ip + "/32")
-				localInterface.DeleteRoute(dst, nextHopGateway)
+				localInterface.DeleteRoute(dst, physicalNextHop(dst))
 			}
 
 			return true
@@ -119,8 +130,21 @@ func DynamicAddIncludeRoutes(ips []string) {
 func DynamicAddExcludeRoutes(ips []string) {
 	for _, ip := range ips {
 		dst, _ := netip.ParsePrefix(ip + "/32")
-		_ = localInterface.AddRoute(dst, nextHopGateway, 5)
+		_ = localInterface.AddRoute(dst, physicalNextHop(dst), 5)
 	}
+}
+
+// physicalNextHop 根据目标地址族返回物理网卡对应网关：
+// IPv4 用 base.LocalInterface.Gateway，IPv6 用 base.LocalInterface.Gateway6。
+// 避免"IPv6 目的地 + IPv4 网关"导致 Windows 报"参数错误"。
+func physicalNextHop(dst netip.Prefix) netip.Addr {
+	if dst.Addr().Is6() {
+		if g, err := netip.ParseAddr(base.LocalInterface.Gateway6); err == nil {
+			return g
+		}
+	}
+	gw, _ := netip.ParseAddr(base.LocalInterface.Gateway)
+	return gw
 }
 
 func GetLocalInterface() error {
@@ -163,6 +187,19 @@ func GetLocalInterface() error {
 	base.LocalInterface.Mac = net.HardwareAddr(primaryInterface.PhysicalAddress()).String()
 
 	localInterface = primaryInterface.LUID
+
+	// 采集同一物理网卡的 IPv6 网关：服务器地址为 IPv6 时，添加服务器 host 路由需要 IPv6 网关，
+	// 否则 IPv6 目的地 + IPv4 网关会导致 Windows 返回"参数错误"
+	// 机器没有 IPv6 时采集失败不影响 IPv4 连接，故忽略错误
+	ipv6Ifcs, err := winipcfg.GetAdaptersAddresses(windows.AF_INET6, winipcfg.GAAFlagIncludeGateways)
+	if err == nil {
+		for _, ifc := range ipv6Ifcs {
+			if ifc.LUID == primaryInterface.LUID && ifc.FirstGatewayAddress != nil {
+				base.LocalInterface.Gateway6 = ifc.FirstGatewayAddress.Address.IP().String()
+				break
+			}
+		}
+	}
 
 	return nil
 }
